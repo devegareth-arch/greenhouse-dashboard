@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart Greenhouse Dashboard</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://js.puter.com/v2/"></script>
+  
+  <style>
+    :root {
+      --bg: #0b1721;
+      --card-bg: rgba(11, 31, 24, 0.9);
+      --accent: #66bb6a;
+      --accent-soft: rgba(102, 187, 106, 0.15);
+      --text-main: #e8f5e9;
+      --text-muted: #a5d6a7;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: radial-gradient(circle at top, #1b5e20 0, #0b1721 55%, #02060a 100%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 15px;
+    }
+
+    .wrapper { width: 100%; max-width: 1100px; }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+    }
+
+    h1 { font-size: 28px; display: flex; gap: 8px; }
+    .subtitle { font-size: 13px; color: var(--text-muted); }
+
+    .pill {
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(102,187,106,0.4);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 18px;
+      margin-bottom: 25px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 14px 35px rgba(0,0,0,0.55);
+    }
+
+    .label { font-size: 13px; color: var(--text-muted); }
+    .value { font-size: 30px; color: var(--accent); }
+
+    .value#co2 { color: #FFA500; } /* orange for CO2 */
+
+    .charts {
+      background: var(--card-bg);
+      border-radius: 18px;
+      padding: 18px;
+    }
+
+    canvas { background: #050e09; border-radius: 12px; padding: 10px; margin-bottom: 20px; }
+  </style>
+
+</head>
+<body>
+<div class="wrapper">
+
+<header>
+  <div>
+    <h1>🌱 Smart Greenhouse</h1>
+    <p class="subtitle">Live climate monitoring</p>
+  </div>
+  <span class="pill">Live</span>
+</header>
+
+<section class="grid">
+  <div class="card">
+    <div class="label">Temperature</div>
+    <div class="value" id="temp">--</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Humidity</div>
+    <div class="value" id="hum">--</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Light</div>
+    <div class="value" id="light">--</div>
+  </div>
+
+  <div class="card">
+    <div class="label">CO₂</div>
+    <div class="value" id="co2">--</div>
+  </div>
+</section>
+
+<section class="charts">
+  <canvas id="tempChart"></canvas>
+  <canvas id="humChart"></canvas>
+  <canvas id="lightChart"></canvas>
+  <canvas id="co2Chart"></canvas>
+</section>
+
+</div>
+
+<a href="https://harvest-helper-ngani.lovable.app" target="_blank" style="padding:10px 20px; background:#66bb6a; color:white; border-radius:8px; text-decoration:none;">
+  Go to Website
+</a>
+<a href="ai.html" style="padding:10px 20px; background:#66bb6a; color:white; border-radius:8px; text-decoration:none;">AI</a>
+
+<script>
+const SUPABASE_URL = "https://huuhwcjigxymbtnbtpnl.supabase.co/rest/v1/sensor_data?select=*&order=id.desc&limit=1";
+const API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1dWh3Y2ppZ3h5bWJ0bmJ0cG5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMzgzOTIsImV4cCI6MjA4ODcxNDM5Mn0.uwvw84nENHg--kyH6gtLxmnI7ZdAWdKfOV1OU1HPwv0";
+
+let tempData=[], humData=[], lightData=[], co2Data=[], labels=[];
+
+// Charts
+const tempChart = new Chart(document.getElementById("tempChart"), {
+  type:'line',
+  data:{labels:labels,datasets:[{label:"Temperature",data:tempData,borderColor:"#66bb6a",borderWidth:2}]}
+});
+const humChart = new Chart(document.getElementById("humChart"), {
+  type:'line',
+  data:{labels:labels,datasets:[{label:"Humidity",data:humData,borderColor:"#4db6ac",borderWidth:2}]}
+});
+const lightChart = new Chart(document.getElementById("lightChart"), {
+  type:'line',
+  data:{labels:labels,datasets:[{label:"Light",data:lightData,borderColor:"#ffee58",borderWidth:2}]}
+});
+const co2Chart = new Chart(document.getElementById("co2Chart"), {
+  type:'line',
+  data:{labels:labels,datasets:[{label:"CO₂",data:co2Data,borderColor:"#FFA500",borderWidth:2}]}
+});
+
+// Fetch latest sensor data
+async function loadData(){
+  try {
+    const res = await fetch(SUPABASE_URL, {
+      headers: {
+        apikey: API_KEY,
+        Authorization: "Bearer " + API_KEY
+      }
+    });
+
+    const data = await res.json();
+    if(!data.length) return;
+
+    const latest = data[0];
+
+    document.getElementById("temp").innerText = latest.temperature;
+    document.getElementById("hum").innerText = latest.humidity;
+    document.getElementById("light").innerText = latest.light;
+    document.getElementById("co2").innerText = latest.CO2;
+
+    const time = new Date().toLocaleTimeString();
+
+    labels.push(time);
+    tempData.push(latest.temperature);
+    humData.push(latest.humidity);
+    lightData.push(latest.light);
+    co2Data.push(latest.CO2);
+
+    if(labels.length>10){
+      labels.shift(); tempData.shift(); humData.shift(); lightData.shift(); co2Data.shift();
+    }
+
+    tempChart.update();
+    humChart.update();
+    lightChart.update();
+    co2Chart.update();
+
+  } catch(err){
+    console.error("Error loading data:", err);
+  }
+}
+
+setInterval(loadData,5000);
+loadData();
+</script>
+
+</body>
+</html>
